@@ -291,6 +291,7 @@ h1, h2, h3, h4, .font-poppins {
 .chip-purple { background: var(--primary); color: #000; }
 .chip-blue   { background: var(--accent-blue); color: white; }
 .chip-pink   { background: #ff90e8; color: #000; }
+.chip-orange { background: #ffad33; color: #000; }
 .chip-gray   { background: #e5e5e5; }
 .chip-remove { border: none; background: none; cursor: pointer; font-size: 14px; padding: 0; color: inherit; display: flex; align-items: center; }
 
@@ -406,6 +407,19 @@ h1, h2, h3, h4, .font-poppins {
 .selected-purple { background: var(--primary) !important; }
 .selected-blue   { background: var(--accent-blue) !important; color: white !important; }
 .selected-pink   { background: #ff90e8 !important; }
+.selected-orange { background: #ffad33 !important; }
+
+/* Sub-industry slide-in animation */
+.sub-industry-group {
+  animation: slideDown 0.3s ease-out;
+  border-left: 4px solid #ffad33;
+  padding-left: 20px;
+  margin-left: 8px;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-12px); max-height: 0; }
+  to   { opacity: 1; transform: translateY(0); max-height: 500px; }
+}
 
 .thumb-preview-wrap { position: relative; width: 200px; }
 .thumb-preview { width: 200px; height: 140px; object-fit: cover; border: var(--border-width) solid var(--border-color); }

@@ -2,6 +2,7 @@ const TAG_COLORS = {
   hook: 'chip-purple',
   format: 'chip-blue',
   industry: 'chip-pink',
+  sub: 'chip-orange',
   default: 'chip-gray',
 };
 

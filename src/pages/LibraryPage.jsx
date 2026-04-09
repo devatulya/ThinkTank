@@ -38,7 +38,7 @@ const LibraryPage = () => {
       r = r.filter(i =>
         i.title?.toLowerCase().includes(q) || i.hook?.toLowerCase().includes(q) ||
         i.tags?.hookType?.toLowerCase().includes(q) || i.tags?.format?.toLowerCase().includes(q) ||
-        i.tags?.industry?.toLowerCase().includes(q)
+        i.tags?.industry?.toLowerCase().includes(q) || i.tags?.subIndustry?.toLowerCase().includes(q)
       );
     }
     if (filters.minRating > 0) r = r.filter(i => (i.rating || 0) >= filters.minRating);

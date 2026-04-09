@@ -1,9 +1,25 @@
 import { useState } from 'react';
 import { FiSearch, FiFilter } from 'react-icons/fi';
 
-const HOOK_TYPES = ['emotional', 'funny', 'shocking', 'relatable', 'inspiring', 'educational'];
-const FORMATS = ['reel', 'carousel', 'storytelling', 'meme', 'ugc', 'tutorial'];
-const INDUSTRIES = ['fashion', 'gifting', 'fintech', 'food', 'beauty', 'tech', 'fitness', 'travel'];
+const HOOK_TYPES = [
+  'authority/expert', 'before-after', 'callout', 'contrarian', 'controversial',
+  'curiosity gap', 'educational', 'emotional', 'fear-based', 'funny',
+  'inspiring', 'myth busting', 'negative emotion', 'personal confession',
+  'problem-solution', 'question-based', 'relatable', 'shocking',
+  'story hook', 'trend-based', 'urgency/scarcity',
+];
+const FORMATS = [
+  'animation/motion', 'behind the scenes', 'carousel', 'case study',
+  'comparison', 'duet/remix', 'interview', 'meme', 'podcast clip',
+  'pov', 'reaction', 'reel', 'screen recording', 'storytelling',
+  'talking head', 'text-based video', 'tutorial', 'ugc', 'vlog', 'voiceover',
+];
+const INDUSTRIES = [
+  'automobile', 'beauty', 'business / startups', 'e-commerce / d2c',
+  'education (edtech)', 'fashion', 'finance', 'fitness',
+  'food & beverage', 'gaming', 'gifting', 'luxury',
+  'personal branding', 'real estate', 'tech', 'travel',
+];
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest First' },
   { value: 'highest-rated', label: 'Highest Rated' },

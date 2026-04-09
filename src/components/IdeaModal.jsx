@@ -1,23 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiX, FiHeart, FiEdit2, FiTrash2, FiExternalLink } from 'react-icons/fi';
 import { FaHeart } from 'react-icons/fa';
 import { useAuth } from '../contexts/AuthContext';
-import { toggleBookmark, deleteIdea } from '../firebase/ideas';
+import { toggleBookmark, deleteIdea, isIdeaBookmarked } from '../firebase/ideas';
 import { toast } from 'react-hot-toast';
 import TagChip from './TagChip';
 import StarRating from './StarRating';
 
 const IdeaModal = ({ idea, onClose, onEdit, onDeleted }) => {
   const { currentUser } = useAuth();
-  const isBookmarked = currentUser && idea.bookmarkedBy?.includes(currentUser.uid);
   const isOwner = currentUser && idea.userId === currentUser.uid;
-  const [localBookmarked, setLocalBookmarked] = useState(isBookmarked);
+  const [localBookmarked, setLocalBookmarked] = useState(
+    currentUser && idea.bookmarkedBy?.includes(currentUser.uid)
+  );
+
+  // Check the user's personal bookmark subcollection on mount
+  useEffect(() => {
+    if (!currentUser) return;
+    let cancelled = false;
+    isIdeaBookmarked(idea.id, currentUser.uid).then(bookmarked => {
+      if (!cancelled) setLocalBookmarked(bookmarked);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [idea.id, currentUser]);
 
   const handleBookmark = async () => {
     if (!currentUser) { toast.error('Sign in to bookmark ideas'); return; }
-    setLocalBookmarked(v => !v);
-    try { await toggleBookmark(idea.id, currentUser.uid, localBookmarked); }
-    catch { setLocalBookmarked(v => !v); toast.error('Failed to update bookmark'); }
+    const wasBookmarked = localBookmarked;
+    setLocalBookmarked(!wasBookmarked);
+    try {
+      await toggleBookmark(idea.id, currentUser.uid, wasBookmarked);
+    } catch {
+      setLocalBookmarked(wasBookmarked);
+      toast.error('Failed to update bookmark');
+    }
   };
 
   const handleDelete = async () => {
@@ -35,18 +51,83 @@ const IdeaModal = ({ idea, onClose, onEdit, onDeleted }) => {
     if (idea.tags?.hookType) tags.push({ label: idea.tags.hookType, type: 'hook' });
     if (idea.tags?.format) tags.push({ label: idea.tags.format, type: 'format' });
     if (idea.tags?.industry) tags.push({ label: idea.tags.industry, type: 'industry' });
+    if (idea.tags?.subIndustry) tags.push({ label: idea.tags.subIndustry, type: 'sub' });
     return tags;
   };
 
   const getThumbnailSrc = () => {
     if (idea.thumbnailUrl) return idea.thumbnailUrl;
-    if (idea.link && (idea.link.includes('instagram.com') || idea.link.includes('tiktok.com') || idea.link.includes('youtube.com') || idea.link.includes('youtu.be') || idea.link.includes('twitter.com') || idea.link.includes('x.com'))) {
-      return `https://api.microlink.io/?url=${encodeURIComponent(idea.link)}&embed=image.url`;
+    if (!idea.link) return null;
+
+    const url = idea.link;
+
+    // YouTube — use direct thumbnail CDN
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      let videoId = null;
+      try {
+        const parsed = new URL(url);
+        if (parsed.hostname.includes('youtu.be')) {
+          videoId = parsed.pathname.slice(1);
+        } else {
+          videoId = parsed.searchParams.get('v');
+          if (!videoId) {
+            const pathMatch = parsed.pathname.match(/\/(shorts|embed)\/([^/?]+)/);
+            if (pathMatch) videoId = pathMatch[2];
+          }
+        }
+      } catch {}
+      if (videoId) return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
     }
+
+    // Instagram, TikTok, Twitter/X — microlink
+    if (url.includes('instagram.com') || url.includes('tiktok.com') ||
+        url.includes('twitter.com') || url.includes('x.com')) {
+      return `https://api.microlink.io/?url=${encodeURIComponent(url)}&embed=image.url`;
+    }
+
+    // Facebook handled separately via useEffect below
     return null;
   };
 
   const dynamicThumb = getThumbnailSrc();
+
+  // Facebook thumbnail fetching
+  const [fbThumb, setFbThumb] = useState(null);
+  const isFacebookLink = idea.link && (
+    idea.link.includes('facebook.com') ||
+    idea.link.includes('fb.watch') ||
+    idea.link.includes('fb.com')
+  );
+
+  useEffect(() => {
+    if (!isFacebookLink || idea.thumbnailUrl) return;
+    let cancelled = false;
+
+    const fetchFbThumb = async () => {
+      try {
+        const noembed = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(idea.link)}`);
+        const data = await noembed.json();
+        if (!cancelled && data.thumbnail_url) {
+          setFbThumb(data.thumbnail_url);
+          return;
+        }
+      } catch {}
+
+      try {
+        const ml = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(idea.link)}`);
+        const mlData = await ml.json();
+        if (!cancelled && mlData?.data?.image?.url) {
+          setFbThumb(mlData.data.image.url);
+          return;
+        }
+      } catch {}
+    };
+
+    fetchFbThumb();
+    return () => { cancelled = true; };
+  }, [idea.link, isFacebookLink, idea.thumbnailUrl]);
+
+  const finalThumb = isFacebookLink && !idea.thumbnailUrl ? fbThumb : dynamicThumb;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -63,8 +144,8 @@ const IdeaModal = ({ idea, onClose, onEdit, onDeleted }) => {
         </div>
 
         {/* Thumbnail */}
-        {dynamicThumb && (
-          <img src={dynamicThumb} alt={idea.title} className="modal-thumb" />
+        {finalThumb && (
+          <img src={finalThumb} alt={idea.title} className="modal-thumb" />
         )}
 
         {/* Hook - HERO */}

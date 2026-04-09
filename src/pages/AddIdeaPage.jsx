@@ -1,18 +1,49 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { addIdea, updateIdea } from '../firebase/ideas';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
 import StarRating from '../components/StarRating';
 import TagChip from '../components/TagChip';
-import { FiUpload, FiX, FiLink, FiSave } from 'react-icons/fi';
+import { FiLink, FiSave } from 'react-icons/fi';
 
-const HOOK_TYPES = ['emotional', 'funny', 'shocking', 'relatable', 'inspiring', 'educational'];
-const FORMATS = ['reel', 'carousel', 'storytelling', 'meme', 'ugc', 'tutorial'];
-const INDUSTRIES = ['fashion', 'gifting', 'fintech', 'food', 'beauty', 'tech', 'fitness', 'travel'];
+const HOOK_TYPES = [
+  'authority/expert', 'before-after', 'callout', 'contrarian', 'controversial',
+  'curiosity gap', 'educational', 'emotional', 'fear-based', 'funny',
+  'inspiring', 'myth busting', 'negative emotion', 'personal confession',
+  'problem-solution', 'question-based', 'relatable', 'shocking',
+  'story hook', 'trend-based', 'urgency/scarcity',
+];
+const FORMATS = [
+  'animation/motion', 'behind the scenes', 'carousel', 'case study',
+  'comparison', 'duet/remix', 'interview', 'meme', 'podcast clip',
+  'pov', 'reaction', 'reel', 'screen recording', 'storytelling',
+  'talking head', 'text-based video', 'tutorial', 'ugc', 'vlog', 'voiceover',
+];
+
+const INDUSTRY_MAP = {
+  'automobile': ['accessories', 'bikes', 'cars', 'ev (electric vehicles)', 'reviews'],
+  'beauty': ['beauty tools', 'dermatology', 'grooming (men)', 'haircare', 'makeup', 'organic/natural', 'skincare'],
+  'business / startups': ['agencies', 'b2b services', 'consulting', 'saas', 'startups'],
+  'e-commerce / d2c': ['clothing stores', 'dropshipping', 'marketplaces', 'niche products', 'subscription boxes'],
+  'education (edtech)': ['career coaching', 'language learning', 'online courses', 'skill development', 'test prep'],
+  'fashion': ['accessories', 'ethnic', 'fast fashion', 'footwear', 'formal', 'luxury', 'streetwear', 'sustainable fashion', 'western'],
+  'finance': ['banking', 'crypto', 'fintech apps', 'insurance', 'investment', 'personal finance', 'trading'],
+  'fitness': ['gym', 'home workout', 'muscle building', 'nutrition', 'supplements', 'weight loss', 'yoga'],
+  'food & beverage': ['beverages', 'cafes', 'cloud kitchen', 'healthy food', 'packaged foods', 'restaurants', 'street food'],
+  'gaming': ['esports', 'mobile gaming', 'pc/console', 'streaming'],
+  'gifting': ['budget gifts', 'corporate gifting', 'festive gifts', 'handmade gifts', 'luxury gifts', 'personalized gifts'],
+  'luxury': ['designer brands', 'high-end lifestyle', 'jewelry', 'watches'],
+  'personal branding': ['coaches', 'creators', 'freelancers', 'influencers', 'thought leaders'],
+  'real estate': ['commercial', 'investment', 'luxury properties', 'rentals', 'residential'],
+  'tech': ['ai tools', 'gadgets', 'hardware', 'mobile apps', 'reviews', 'software tools', 'web apps'],
+  'travel': ['adventure', 'budget travel', 'hotels/resorts', 'local experiences', 'luxury travel', 'solo travel'],
+};
+
+const INDUSTRIES = Object.keys(INDUSTRY_MAP);
 
 const EMPTY_FORM = {
   title: '', link: '', hook: '', whyLiked: '', whyWorks: '',
-  tags: { hookType: '', format: '', industry: '' }, rating: 0,
+  tags: { hookType: '', format: '', industry: '', subIndustry: '' }, rating: 0,
 };
 
 const AddIdeaPage = ({ editIdea = null, onEditDone }) => {
@@ -23,14 +54,11 @@ const AddIdeaPage = ({ editIdea = null, onEditDone }) => {
     hook: editIdea.hook || '',
     whyLiked: editIdea.whyLiked || '',
     whyWorks: editIdea.whyWorks || '',
-    tags: editIdea.tags || { hookType: '', format: '', industry: '' },
+    tags: editIdea.tags || { hookType: '', format: '', industry: '', subIndustry: '' },
     rating: editIdea.rating || 0,
   } : EMPTY_FORM);
 
-  const [thumbnail, setThumbnail] = useState(null);
-  const [thumbPreview, setThumbPreview] = useState(editIdea?.thumbnailUrl || null);
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef();
 
   const handleChange = (key, value) =>
     setForm(prev => ({ ...prev, [key]: value }));
@@ -41,11 +69,23 @@ const AddIdeaPage = ({ editIdea = null, onEditDone }) => {
       tags: { ...prev.tags, [type]: prev.tags[type] === value ? '' : value },
     }));
 
-  const handleThumb = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setThumbnail(file);
-    setThumbPreview(URL.createObjectURL(file));
+  const handleIndustry = (industry) => {
+    setForm(prev => ({
+      ...prev,
+      tags: {
+        ...prev.tags,
+        industry: prev.tags.industry === industry ? '' : industry,
+        // Clear sub-industry when changing/deselecting industry
+        subIndustry: prev.tags.industry === industry ? '' : prev.tags.subIndustry,
+      },
+    }));
+  };
+
+  const handleSubIndustry = (sub) => {
+    setForm(prev => ({
+      ...prev,
+      tags: { ...prev.tags, subIndustry: prev.tags.subIndustry === sub ? '' : sub },
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -54,15 +94,13 @@ const AddIdeaPage = ({ editIdea = null, onEditDone }) => {
     setSaving(true);
     try {
       if (editIdea) {
-        await updateIdea(editIdea.id, form, thumbnail, currentUser.uid);
+        await updateIdea(editIdea.id, form);
         toast.success('Idea updated! ✨');
         onEditDone?.();
       } else {
-        await addIdea(form, currentUser.uid, thumbnail);
+        await addIdea(form, currentUser.uid);
         toast.success('Idea saved! 🎉');
         setForm(EMPTY_FORM);
-        setThumbnail(null);
-        setThumbPreview(null);
       }
     } catch (err) {
       toast.error('Failed to save idea. Check your Firebase config.');
@@ -71,6 +109,8 @@ const AddIdeaPage = ({ editIdea = null, onEditDone }) => {
       setSaving(false);
     }
   };
+
+  const subIndustries = form.tags.industry ? (INDUSTRY_MAP[form.tags.industry] || []) : [];
 
   return (
     <div className="add-page">
@@ -168,37 +208,36 @@ const AddIdeaPage = ({ editIdea = null, onEditDone }) => {
           </div>
         </div>
 
+        {/* Industry */}
         <div className="form-group">
           <label className="form-label">🏭 Industry</label>
           <div className="chip-selector">
             {INDUSTRIES.map(i => (
               <button key={i} type="button"
                 className={`chip-option ${form.tags.industry === i ? 'selected-pink' : ''}`}
-                onClick={() => handleTag('industry', i)}>{i}</button>
+                onClick={() => handleIndustry(i)}>{i}</button>
             ))}
           </div>
         </div>
+
+        {/* Sub-Industry — only shown when industry is selected */}
+        {form.tags.industry && subIndustries.length > 0 && (
+          <div className="form-group sub-industry-group">
+            <label className="form-label">📌 Sub-Industry — {form.tags.industry}</label>
+            <div className="chip-selector">
+              {subIndustries.map(s => (
+                <button key={s} type="button"
+                  className={`chip-option ${form.tags.subIndustry === s ? 'selected-orange' : ''}`}
+                  onClick={() => handleSubIndustry(s)}>{s}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Rating */}
         <div className="form-group">
           <label className="form-label">⭐ Rating</label>
           <StarRating value={form.rating} onChange={r => handleChange('rating', r)} size="lg" />
-        </div>
-
-        {/* Thumbnail */}
-        <div className="form-group">
-          <label className="form-label">🖼️ Thumbnail (optional)</label>
-          {thumbPreview ? (
-            <div className="thumb-preview-wrap">
-              <img src={thumbPreview} alt="preview" className="thumb-preview" />
-              <button type="button" onClick={() => { setThumbnail(null); setThumbPreview(null); }} className="thumb-remove"><FiX /></button>
-            </div>
-          ) : (
-            <button type="button" onClick={() => fileRef.current.click()} className="thumb-upload-btn">
-              <FiUpload /> Upload Image
-            </button>
-          )}
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleThumb} className="hidden" />
         </div>
 
         <button type="submit" disabled={saving} className="brutal-btn btn-save-idea" id="save-idea-btn">
