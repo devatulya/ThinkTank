@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { addIdea, updateIdea } from '../firebase/ideas';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -58,7 +59,46 @@ const AddIdeaPage = ({ editIdea = null, onEditDone }) => {
     rating: editIdea.rating || 0,
   } : EMPTY_FORM);
 
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const title = searchParams.get('title');
+    const text = searchParams.get('text');
+    const url = searchParams.get('url');
+
+    let linkToUse = '';
+    let titleToUse = title || '';
+
+    // Some apps share the link in the 'text' field
+    if (url) {
+      linkToUse = url;
+    } else if (text) {
+      // Very basic URL extraction from text
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const match = text.match(urlRegex);
+      if (match) {
+        linkToUse = match[0];
+        // If text was only the URL, don't use it as title, otherwise keep the title or text without URL
+        if (!titleToUse && text !== match[0]) {
+          titleToUse = text.replace(match[0], '').trim();
+        }
+      } else if (!titleToUse) {
+        titleToUse = text;
+      }
+    }
+
+    if (linkToUse || titleToUse) {
+      setForm(prev => ({
+        ...prev,
+        title: titleToUse || prev.title,
+        link: linkToUse || prev.link
+      }));
+      // Clean up the URL so params don't persist on refresh
+      navigate('/add', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   const handleChange = (key, value) =>
     setForm(prev => ({ ...prev, [key]: value }));
